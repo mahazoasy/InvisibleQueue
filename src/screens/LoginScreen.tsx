@@ -16,7 +16,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isLogin, setIsLogin] = useState(true);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, loginAsGuest } = useAuth();
 
   const handleSubmit = async () => {
     try {
@@ -37,7 +37,7 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   const continueAsGuest = () => {
-    navigation.replace('Home');
+    loginAsGuest();  // Active le mode invité
   };
 
   return (

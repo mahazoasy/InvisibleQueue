@@ -19,13 +19,15 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 
 function AppNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, isGuest } = useAuth();
 
   if (loading) return null;
 
+  const showLogin = !user && !isGuest;
+
   return (
     <Stack.Navigator>
-      {!user ? (
+      {showLogin ? (
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       ) : (
         <>

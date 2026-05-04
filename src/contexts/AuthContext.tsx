@@ -8,9 +8,11 @@ type AuthContextType = {
   session: Session | null;
   guestSessionId: string | null;
   loading: boolean;
+  isGuest: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  loginAsGuest: () => void;
   isAuthenticated: boolean;
 };
 
@@ -21,6 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -49,6 +52,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    // Si connexion réussie, on désactive le mode invité
+    setIsGuest(false);
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -63,6 +68,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    setIsGuest(false);
+  };
+
+  const loginAsGuest = () => {
+    setIsGuest(true);
   };
 
   return (
@@ -71,9 +81,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       session,
       guestSessionId,
       loading,
+      isGuest,
       signIn,
       signUp,
       signOut,
+      loginAsGuest,
       isAuthenticated: !!user,
     }}>
       {children}
