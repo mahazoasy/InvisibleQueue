@@ -27,6 +27,7 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
   const [totalWaiting, setTotalWaiting] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
+  const [lastNotifiedThreshold, setLastNotifiedThreshold] = useState<number>(0);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const notifAnim = useRef(new Animated.Value(-100)).current;
@@ -94,8 +95,20 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
       const pos = waitingEntries.findIndex(e => e.id === currentEntry.id) + 1;
       setPosition(pos);
       setTotalWaiting(waitingEntries.length);
-      if (pos <= 3 && pos > 0 && currentEntry.status === 'waiting') {
-        setNotification(`⚡ Vous êtes en position ${pos} — Préparez-vous !`);
+
+      // Notifications selon le nombre de personnes devant
+      if (currentEntry.status === 'waiting') {
+        if (pos <= 3 && lastNotifiedThreshold !== 3) {
+          setNotification(`⚡ Vous êtes en position ${pos} — Préparez-vous !`);
+          setLastNotifiedThreshold(3);
+        } else if (pos <= 6 && pos > 3 && lastNotifiedThreshold !== 6) {
+          setNotification(`⏳ Plus que ${pos - 1} personne(s) devant vous. Restez proche !`);
+          setLastNotifiedThreshold(6);
+        } else if (pos <= 10 && pos > 6 && lastNotifiedThreshold !== 10) {
+          const waitMin = (pos - 1) * 2;
+          setNotification(`🕒 Environ ${waitMin} minute${waitMin > 1 ? 's' : ''} d'attente.`);
+          setLastNotifiedThreshold(10);
+        }
       }
     }
     setLoading(false);
@@ -195,7 +208,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
 
-      {/* Notification Banner */}
       {notification && (
         <Animated.View style={[styles.notifBanner, { transform: [{ translateY: notifAnim }] }]}>
           <Text style={styles.notifText}>{notification}</Text>
@@ -203,7 +215,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
       )}
 
       <View style={styles.container}>
-        {/* Queue Name */}
         <View style={styles.queueHeader}>
           <Text style={styles.queueName} numberOfLines={2}>{queue?.name}</Text>
           <View style={styles.waitingBadge}>
@@ -212,14 +223,12 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Position Card */}
         <Animated.View style={[styles.positionCard, { transform: [{ scale: pulseAnim }], borderColor: posColor }]}>
           <Text style={styles.positionLabel}>Votre position</Text>
           <Text style={[styles.positionNumber, { color: posColor }]}>{position}</Text>
           <Text style={styles.positionSub}>sur {totalWaiting} personne{totalWaiting > 1 ? 's' : ''}</Text>
         </Animated.View>
 
-        {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Ionicons name="people-outline" size={22} color="#1A73E8" />
@@ -234,7 +243,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Progress Bar */}
         {totalWaiting > 0 && (
           <View style={styles.progressContainer}>
             <Text style={styles.progressLabel}>Progression de la file</Text>
@@ -252,7 +260,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* Info Note */}
         <View style={styles.infoNote}>
           <Ionicons name="information-circle-outline" size={16} color="#8A94A6" />
           <Text style={styles.infoNoteText}>
@@ -262,7 +269,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
 
         <View style={styles.spacer} />
 
-        {/* Leave Button */}
         <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveQueue} activeOpacity={0.85}>
           <Ionicons name="exit-outline" size={20} color="#E74C3C" style={{ marginRight: 8 }} />
           <Text style={styles.leaveBtnText}>Quitter la file</Text>
