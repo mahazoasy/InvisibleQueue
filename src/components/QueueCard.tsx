@@ -1,36 +1,29 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Queue } from '../services/supabase';
 
+type QueueWithCount = Queue & { waitingCount: number };
+
 type QueueCardProps = {
-  queue: Queue & { waitingCount: number; distance?: number };
+  queue: QueueWithCount;
   onPress: () => void;
-  loading?: boolean;
-  isCreator?: boolean;
-  onManagePress?: () => void;
+  distance?: number; // optionnel, en km
 };
 
-export default function QueueCard({ 
-  queue, 
-  onPress, 
-  loading = false, 
-  isCreator = false,
-  onManagePress 
-}: QueueCardProps) {
+export default function QueueCard({ queue, onPress, distance }: QueueCardProps) {
   const getWaitingStatusColor = (count: number) => {
     if (count === 0) return '#2ecc71';
     if (count < 5) return '#f39c12';
     return '#e74c3c';
   };
 
-  const formatDistance = (distance?: number) => {
-    if (distance === undefined) return 'Calcul...';
-    if (distance < 1) return `${(distance * 1000).toFixed(0)} m`;
-    return `${distance.toFixed(1)} km`;
+  const formatDistance = (dist?: number) => {
+    if (dist === undefined) return '...';
+    if (dist < 1) return `${(dist * 1000).toFixed(0)} m`;
+    return `${dist.toFixed(1)} km`;
   };
 
   const getEstimatedWaitTime = (count: number) => {
-    // Estimation approximative : 2 minutes par personne
     const minutes = count * 2;
     if (minutes === 0) return 'Immédiat';
     if (minutes < 60) return `${minutes} min`;
@@ -40,26 +33,10 @@ export default function QueueCard({
   };
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      disabled={loading}
-      activeOpacity={0.7}
-    >
-      <View style={styles.header}>
-        <Text style={styles.queueName} numberOfLines={1}>
-          {queue.name}
-        </Text>
-        {isCreator && (
-          <TouchableOpacity 
-            style={styles.manageButton} 
-            onPress={onManagePress}
-            disabled={loading}
-          >
-            <Text style={styles.manageButtonText}>Gérer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+      <Text style={styles.queueName} numberOfLines={1}>
+        {queue.name}
+      </Text>
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
@@ -73,18 +50,15 @@ export default function QueueCard({
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{formatDistance(queue.distance)}</Text>
+          <Text style={styles.statValue}>{formatDistance(distance)}</Text>
           <Text style={styles.statLabel}>distance</Text>
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <View style={[styles.statusBadge, { backgroundColor: getWaitingStatusColor(queue.waitingCount) }]}>
-          <Text style={styles.statusText}>
-            {queue.waitingCount === 0 ? 'Disponible' : queue.waitingCount < 5 ? 'Affluence modérée' : 'Très fréquenté'}
-          </Text>
-        </View>
-        {loading && <ActivityIndicator size="small" color="#3498db" />}
+      <View style={[styles.statusBadge, { backgroundColor: getWaitingStatusColor(queue.waitingCount) }]}>
+        <Text style={styles.statusText}>
+          {queue.waitingCount === 0 ? 'Disponible' : queue.waitingCount < 5 ? 'Affluence modérée' : 'Très fréquenté'}
+        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -102,29 +76,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   queueName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2c3e50',
-    flex: 1,
-    marginRight: 10,
-  },
-  manageButton: {
-    backgroundColor: '#3498db',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  manageButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+    marginBottom: 12,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -154,13 +110,8 @@ const styles = StyleSheet.create({
     height: 30,
     backgroundColor: '#ddd',
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
   statusBadge: {
+    alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,

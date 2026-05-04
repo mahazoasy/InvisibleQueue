@@ -160,7 +160,8 @@ export default function HomeScreen({ navigation }: Props) {
           setJoinModalVisible(true);
         }
       }}
-      distance={location ? getDistanceFromLatLonInKm(location.latitude, location.longitude, item.latitude, item.longitude) : null}
+      // Correction : utiliser undefined au lieu de null
+      distance={location ? getDistanceFromLatLonInKm(location.latitude, location.longitude, item.latitude, item.longitude) : undefined}
     />
   );
 

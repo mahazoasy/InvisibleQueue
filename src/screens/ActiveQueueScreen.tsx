@@ -90,15 +90,15 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
         table: 'queue_entries',
         filter: `queue_id=eq.${queueId}`,
       }, async (payload) => {
-        // Mettre à jour l'entrée si c'est la nôtre
-        if (payload.new && payload.new.id === entryId) {
-          const newEntry = payload.new as QueueEntry;
+        // Correction : typage explicite du payload
+        const newEntry = payload.new as QueueEntry | null;
+        if (newEntry && newEntry.id === entryId) {
           setEntry(newEntry);
           if (newEntry.status !== 'waiting') {
             Alert.alert(
               'File terminée',
-              newEntry.status === 'served' 
-                ? 'Votre tour est passé ! Vous avez été servi.' 
+              newEntry.status === 'served'
+                ? 'Votre tour est passé ! Vous avez été servi.'
                 : 'Vous avez été exclu de la file après 3 retards.'
             );
             await clearActiveEntry();
@@ -106,8 +106,8 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
             return;
           }
         }
-        // Rafraîchir la position avec l'entrée la plus récente
-        await updatePosition(entry || (payload.new as QueueEntry));
+        // Rafraîchir la position avec l'entrée la plus récente (état)
+        if (entry) await updatePosition(entry);
       })
       .subscribe();
   };
