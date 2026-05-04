@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  TextInput,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { supabase, Queue } from '../services/supabase';
@@ -27,7 +36,46 @@ export default function HomeScreen({ navigation }: Props) {
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const { user, guestSessionId, isAuthenticated } = useAuth();
+  const { user, guestSessionId, isAuthenticated, signOut } = useAuth();
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleSignOut}
+          style={{ marginRight: 16, paddingHorizontal: 8, paddingVertical: 4 }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>
+            Déconnexion
+          </Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  const handleSignOut = async () => {
+    Alert.alert(
+      'Déconnexion',
+      'Voulez-vous vraiment vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Déconnecter',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut(); // Appel au contexte
+              // La navigation reviendra automatiquement vers LoginScreen
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de se déconnecter pour le moment.');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   useEffect(() => {
     requestLocationPermission();
@@ -160,7 +208,6 @@ export default function HomeScreen({ navigation }: Props) {
           setJoinModalVisible(true);
         }
       }}
-      // Correction : utiliser undefined au lieu de null
       distance={location ? getDistanceFromLatLonInKm(location.latitude, location.longitude, item.latitude, item.longitude) : undefined}
     />
   );
