@@ -115,9 +115,30 @@ export default function HomeScreen({ navigation }: Props) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  const openJoinModal = (queue: Queue) => {
+  // ----- FONCTIONS CORRIGÉES -----
+  const openJoinModal = async (queue: Queue) => {
     setSelectedQueue(queue);
     if (isAuthenticated) {
+      // Vérifier si l'utilisateur a déjà une entrée active dans cette file
+      const { data: existing, error } = await supabase
+        .from('queue_entries')
+        .select('id')
+        .eq('queue_id', queue.id)
+        .eq('user_id', user?.id)
+        .eq('status', 'waiting')
+        .maybeSingle();
+
+      if (existing) {
+        Alert.alert(
+          'Déjà inscrit',
+          'Vous êtes déjà dans cette file d\'attente.',
+          [
+            { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: queue.id }) },
+            { text: 'OK' }
+          ]
+        );
+        return;
+      }
       joinQueue(queue);
     } else {
       setJoinModalVisible(true);
@@ -128,9 +149,34 @@ export default function HomeScreen({ navigation }: Props) {
     const target = queue || selectedQueue;
     if (!location || !target) return;
 
+    // Vérifier la distance
     if (getDistance(location.latitude, location.longitude, target.latitude, target.longitude) > RADIUS_KM) {
       Alert.alert('Trop loin', `Vous devez être à moins de ${RADIUS_KM} km pour rejoindre cette file.`);
       return;
+    }
+
+    // Cas invité : vérifier si une entrée existe déjà via session_id
+    if (!isAuthenticated) {
+      const { data: existing } = await supabase
+        .from('queue_entries')
+        .select('id')
+        .eq('queue_id', target.id)
+        .eq('session_id', guestSessionId)
+        .eq('status', 'waiting')
+        .maybeSingle();
+
+      if (existing) {
+        Alert.alert(
+          'Déjà inscrit',
+          'Vous êtes déjà dans cette file d\'attente.',
+          [
+            { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: target.id }) },
+            { text: 'OK' }
+          ]
+        );
+        setJoinModalVisible(false);
+        return;
+      }
     }
 
     const displayName = isAuthenticated
@@ -201,7 +247,6 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
       <View style={styles.container}>
-        {/* Search/Info Bar */}
         <View style={styles.infoBar}>
           <View style={styles.locationPill}>
             <Ionicons name="location" size={14} color="#1A73E8" />
@@ -259,7 +304,6 @@ export default function HomeScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Join Modal */}
       <Modal visible={joinModalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
