@@ -36,47 +36,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
-  const { user, guestSessionId, isAuthenticated, signOut } = useAuth();
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={handleSignOut}
-          style={{ marginRight: 16, paddingHorizontal: 8, paddingVertical: 4 }}
-          activeOpacity={0.7}
-        >
-          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>
-            Déconnexion
-          </Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation]);
-
-  const handleSignOut = async () => {
-    Alert.alert(
-      'Déconnexion',
-      'Voulez-vous vraiment vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnecter',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              // Après signOut, user devient null et isGuest false.
-              // App.tsx refera automatiquement l'affichage de LoginScreen.
-            } catch (error) {
-              Alert.alert('Erreur', 'Impossible de se déconnecter pour le moment.');
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+  const { user, guestSessionId, isAuthenticated } = useAuth(); 
 
   useEffect(() => {
     requestLocationPermission();
