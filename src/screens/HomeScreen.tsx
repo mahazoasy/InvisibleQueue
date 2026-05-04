@@ -65,8 +65,9 @@ export default function HomeScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await signOut(); // Appel au contexte
-              // La navigation reviendra automatiquement vers LoginScreen
+              await signOut();
+              // Après signOut, user devient null et isGuest false.
+              // App.tsx refera automatiquement l'affichage de LoginScreen.
             } catch (error) {
               Alert.alert('Erreur', 'Impossible de se déconnecter pour le moment.');
             }
