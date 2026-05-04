@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase, QueueEntry } from '../services/supabase';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 
 type ManageQueueRouteProp = RouteProp<RootStackParamList, 'ManageQueue'>;
+type ManageQueueNavigationProp = StackNavigationProp<RootStackParamList, 'ManageQueue'>;
 
 type Props = {
   route: ManageQueueRouteProp;
@@ -12,8 +15,19 @@ type Props = {
 
 export default function ManageQueueScreen({ route }: Props) {
   const { queueId, queueName } = route.params;
+  const navigation = useNavigation<ManageQueueNavigationProp>(); 
   const [waitingEntries, setWaitingEntries] = useState<QueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={handleDeleteQueue} style={{ marginRight: 16 }}>
+          <Ionicons name="trash-outline" size={24} color="#E74C3C" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   useEffect(() => {
     fetchEntries();
@@ -58,6 +72,43 @@ export default function ManageQueueScreen({ route }: Props) {
     } else {
       Alert.alert('Retard', "L'utilisateur recule de 3 positions");
     }
+  };
+
+  const handleDeleteQueue = async () => {
+    Alert.alert(
+      'Supprimer la file',
+      `Êtes-vous sûr de vouloir supprimer définitivement la file "${queueName}" ?\nToutes les personnes en attente seront également supprimées.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Supprimer d'abord les entrées associées
+              const { error: entriesError } = await supabase
+                .from('queue_entries')
+                .delete()
+                .eq('queue_id', queueId);
+              if (entriesError) throw entriesError;
+              
+              // Supprimer la file
+              const { error: queueError } = await supabase
+                .from('queues')
+                .delete()
+                .eq('id', queueId);
+              if (queueError) throw queueError;
+              
+              Alert.alert('Succès', 'File supprimée avec succès');
+              // Retourner à l'écran d'accueil et vider la pile
+              navigation.replace('Home');
+            } catch (error: any) {
+              Alert.alert('Erreur', error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renderEntry = ({ item, index }: { item: QueueEntry; index: number }) => (
