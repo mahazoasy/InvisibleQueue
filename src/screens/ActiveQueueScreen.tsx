@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { supabase, QueueEntry, Queue } from '../services/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { clearActiveEntry } from '../utils/storage';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
@@ -24,38 +23,44 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     fetchData();
-    subscribeToRealtime();
+    const subscription = subscribeToRealtime();
 
     return () => {
+      subscription?.unsubscribe();
       supabase.removeAllChannels();
     };
   }, []);
 
   const fetchData = async () => {
-    const { data: entryData, error: entryError } = await supabase
-      .from('queue_entries')
-      .select('*')
-      .eq('id', entryId)
-      .single();
+    try {
+      const { data: entryData, error: entryError } = await supabase
+        .from('queue_entries')
+        .select('*')
+        .eq('id', entryId)
+        .single();
 
-    if (entryError) {
+      if (entryError) throw entryError;
+
+      const { data: queueData, error: queueError } = await supabase
+        .from('queues')
+        .select('*')
+        .eq('id', queueId)
+        .single();
+
+      if (queueError) throw queueError;
+
+      setEntry(entryData);
+      setQueue(queueData);
+      await updatePosition(entryData);
+    } catch (error) {
       Alert.alert('Erreur', 'Impossible de charger votre position');
       navigation.goBack();
-      return;
     }
-
-    const { data: queueData } = await supabase
-      .from('queues')
-      .select('*')
-      .eq('id', queueId)
-      .single();
-
-    setEntry(entryData);
-    setQueue(queueData);
-    await updatePosition(entryData);
   };
 
-  const updatePosition = async (currentEntry: QueueEntry) => {
+  const updatePosition = async (currentEntry: QueueEntry | null) => {
+    if (!currentEntry) return;
+
     const { data: waitingEntries } = await supabase
       .from('queue_entries')
       .select('queue_order, id')
@@ -68,7 +73,7 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
       setPosition(pos);
       setTotalWaiting(waitingEntries.length);
 
-      if (pos <= 3 && pos > 0 && currentEntry.status === 'waiting') {
+      if (pos <= 3 && pos > 0 && currentEntry.status === 'waiting' && !notification) {
         setNotification(`⚠️ Vous êtes position ${pos} - Préparez-vous !`);
         setTimeout(() => setNotification(null), 5000);
       }
@@ -77,7 +82,7 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
   };
 
   const subscribeToRealtime = () => {
-    const subscription = supabase
+    return supabase
       .channel(`queue_${queueId}`)
       .on('postgres_changes', {
         event: '*',
@@ -85,19 +90,26 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
         table: 'queue_entries',
         filter: `queue_id=eq.${queueId}`,
       }, async (payload) => {
+        // Mettre à jour l'entrée si c'est la nôtre
         if (payload.new && payload.new.id === entryId) {
-          setEntry(payload.new as QueueEntry);
-          if ((payload.new as QueueEntry).status !== 'waiting') {
-            Alert.alert('File terminée', 'Vous avez été servi ou exclu de la file.');
+          const newEntry = payload.new as QueueEntry;
+          setEntry(newEntry);
+          if (newEntry.status !== 'waiting') {
+            Alert.alert(
+              'File terminée',
+              newEntry.status === 'served' 
+                ? 'Votre tour est passé ! Vous avez été servi.' 
+                : 'Vous avez été exclu de la file après 3 retards.'
+            );
             await clearActiveEntry();
             navigation.replace('Home');
+            return;
           }
         }
-        await updatePosition((payload.new?.id === entryId ? payload.new : entry) as QueueEntry);
+        // Rafraîchir la position avec l'entrée la plus récente
+        await updatePosition(entry || (payload.new as QueueEntry));
       })
       .subscribe();
-
-    return () => subscription.unsubscribe();
   };
 
   const handleLeaveQueue = async () => {
@@ -118,9 +130,16 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
   if (loading) return <ActivityIndicator size="large" style={styles.loader} />;
 
   if (entry?.status !== 'waiting') {
+    let statusMessage = '';
+    switch (entry?.status) {
+      case 'served': statusMessage = '✅ Vous avez été servi(e) !'; break;
+      case 'excluded': statusMessage = '❌ Vous avez été exclu(e) après 3 retards.'; break;
+      case 'left': statusMessage = '🚪 Vous avez quitté la file.'; break;
+      default: statusMessage = `Statut: ${entry?.status}`;
+    }
     return (
       <View style={styles.container}>
-        <Text style={styles.statusText}>Statut: {entry?.status}</Text>
+        <Text style={styles.statusText}>{statusMessage}</Text>
         <TouchableOpacity style={styles.button} onPress={() => navigation.replace('Home')}>
           <Text style={styles.buttonText}>Retour à l'accueil</Text>
         </TouchableOpacity>
@@ -130,7 +149,11 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {notification && <View style={styles.notification}><Text style={styles.notificationText}>{notification}</Text></View>}
+      {notification && (
+        <View style={styles.notification}>
+          <Text style={styles.notificationText}>{notification}</Text>
+        </View>
+      )}
       <Text style={styles.queueName}>{queue?.name}</Text>
       <View style={styles.positionCard}>
         <Text style={styles.positionLabel}>Votre position</Text>
@@ -160,5 +183,5 @@ const styles = StyleSheet.create({
   buttonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   notification: { backgroundColor: '#f39c12', padding: 12, borderRadius: 8, marginBottom: 20, width: '100%' },
   notificationText: { color: 'white', textAlign: 'center', fontWeight: 'bold' },
-  statusText: { fontSize: 20, textAlign: 'center', marginTop: 50 },
+  statusText: { fontSize: 20, textAlign: 'center', marginTop: 50, marginBottom: 20 },
 });

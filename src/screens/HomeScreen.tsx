@@ -4,8 +4,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { supabase, Queue } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { getGuestSession, setActiveEntry } from '../utils/storage';
+import { setActiveEntry } from '../utils/storage';
 import { StackNavigationProp } from '@react-navigation/stack';
+import QueueCard from '../components/QueueCard';
 import { RootStackParamList } from '../../App';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
@@ -68,7 +69,6 @@ export default function HomeScreen({ navigation }: Props) {
       return distance <= RADIUS_KM;
     });
 
-    // Ajouter le nombre de personnes en attente
     const queuesWithCount = await Promise.all(filtered.map(async (queue) => {
       const { count } = await supabase
         .from('queue_entries')
@@ -115,7 +115,6 @@ export default function HomeScreen({ navigation }: Props) {
       return;
     }
 
-    // Obtenir le prochain ordre
     const { data: lastEntry } = await supabase
       .from('queue_entries')
       .select('queue_order')
@@ -151,8 +150,8 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const renderQueueCard = ({ item }: { item: QueueWithCount }) => (
-    <TouchableOpacity
-      style={styles.card}
+    <QueueCard
+      queue={item}
       onPress={() => {
         setSelectedQueue(item);
         if (isAuthenticated) {
@@ -161,15 +160,8 @@ export default function HomeScreen({ navigation }: Props) {
           setJoinModalVisible(true);
         }
       }}
-    >
-      <Text style={styles.queueName}>{item.name}</Text>
-      <Text style={styles.queueInfo}>🚶 En attente: {item.waitingCount} personnes</Text>
-      {location && (
-        <Text style={styles.queueInfo}>
-          ⏱️ Distance: {getDistanceFromLatLonInKm(location.latitude, location.longitude, item.latitude, item.longitude).toFixed(1)} km
-        </Text>
-      )}
-    </TouchableOpacity>
+      distance={location ? getDistanceFromLatLonInKm(location.latitude, location.longitude, item.latitude, item.longitude) : null}
+    />
   );
 
   return (
@@ -224,9 +216,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   loading: { textAlign: 'center', marginTop: 20, color: '#7f8c8d' },
   list: { padding: 16 },
-  card: { backgroundColor: 'white', padding: 16, borderRadius: 12, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  queueName: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  queueInfo: { fontSize: 14, color: '#666', marginTop: 4 },
   empty: { textAlign: 'center', marginTop: 50, color: '#999' },
   fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#3498db', width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 4 },
   fabText: { fontSize: 28, color: 'white', fontWeight: 'bold' },
