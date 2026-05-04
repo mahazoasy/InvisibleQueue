@@ -8,7 +8,6 @@ import {
   Alert,
   Modal,
   TextInput,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +15,7 @@ import {
   Animated,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, Queue } from '../services/supabase';
