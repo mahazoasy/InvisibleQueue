@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  StatusBar,
+} from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,137 +16,238 @@ export default function ProfileScreen() {
   const { user, isGuest, signOut, isAuthenticated } = useAuth();
 
   const handleSignOut = async () => {
-    Alert.alert(
-      'Déconnexion',
-      'Voulez-vous vraiment vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnecter',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              // La navigation reviendra automatiquement à l'écran de connexion
-            } catch (error) {
-              Alert.alert('Erreur', 'Impossible de se déconnecter.');
-            }
-          },
+    Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Déconnecter',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch {
+            Alert.alert('Erreur', 'Impossible de se déconnecter.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
+  const displayName =
+    user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur';
+  const initials = displayName
+    .split(' ')
+    .map((w: string) => w[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="person-circle" size={80} color="#3498db" />
-        <Text style={styles.title}>Mon profil</Text>
-      </View>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F1C3F" />
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
-      <View style={styles.card}>
-        {isGuest ? (
-          <>
-            <Text style={styles.label}>Mode invité</Text>
-            <Text style={styles.info}>
-              Vous naviguez en tant qu'invité. Pour profiter de toutes les fonctionnalités (création de files, historique, etc.), créez un compte.
+        {/* Hero Header */}
+        <View style={styles.hero}>
+          <View style={styles.avatarCircle}>
+            {isGuest ? (
+              <Ionicons name="person-outline" size={36} color="#FFFFFF" />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
+          </View>
+          <Text style={styles.heroName}>
+            {isGuest ? 'Mode Invité' : displayName}
+          </Text>
+          <View style={styles.heroBadge}>
+            <Ionicons
+              name={isGuest ? 'walk-outline' : 'checkmark-circle'}
+              size={13}
+              color={isGuest ? '#F39C12' : '#2ECC71'}
+            />
+            <Text style={[styles.heroBadgeText, { color: isGuest ? '#F39C12' : '#2ECC71' }]}>
+              {isGuest ? 'Invité' : 'Compte vérifié'}
             </Text>
-          </>
-        ) : (
-          <>
-            <View style={styles.infoRow}>
-              <Ionicons name="person-outline" size={20} color="#666" />
-              <Text style={styles.label}>Nom :</Text>
-              <Text style={styles.info}>{user?.user_metadata?.full_name || user?.email?.split('@')[0]}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="mail-outline" size={20} color="#666" />
-              <Text style={styles.label}>Email :</Text>
-              <Text style={styles.info}>{user?.email}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#2ecc71" />
-              <Text style={styles.label}>Statut :</Text>
-              <Text style={styles.info}>Compte vérifié</Text>
-            </View>
-          </>
-        )}
+          </View>
+        </View>
+
+        {/* Info Card */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Informations</Text>
+          <View style={styles.card}>
+            {isGuest ? (
+              <View style={styles.guestInfo}>
+                <Ionicons name="information-circle-outline" size={40} color="#F39C12" />
+                <Text style={styles.guestTitle}>Navigation en mode invité</Text>
+                <Text style={styles.guestText}>
+                  Créez un compte pour accéder à toutes les fonctionnalités : création de files, historique de vos passages et bien plus.
+                </Text>
+              </View>
+            ) : (
+              <>
+                <InfoRow icon="person-outline" label="Nom" value={displayName} />
+                <View style={styles.cardDivider} />
+                <InfoRow icon="mail-outline" label="Email" value={user?.email || '—'} />
+                <View style={styles.cardDivider} />
+                <InfoRow
+                  icon="shield-checkmark-outline"
+                  label="Compte"
+                  value="Vérifié"
+                  valueColor="#2ECC71"
+                />
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* App Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>À propos</Text>
+          <View style={styles.card}>
+            <InfoRow icon="layers-outline" label="Version" value="1.0.0" />
+            <View style={styles.cardDivider} />
+            <InfoRow icon="globe-outline" label="Application" value="Invisible Queue" />
+          </View>
+        </View>
+
+        {/* Logout */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut} activeOpacity={0.85}>
+          <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+          <Text style={styles.logoutBtnText}>Déconnexion</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.footerNote}>Invisible Queue © 2026</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function InfoRow({
+  icon,
+  label,
+  value,
+  valueColor,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <View style={styles.infoIconWrap}>
+        <Ionicons name={icon as any} size={18} color="#1A73E8" />
       </View>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-        <Ionicons name="log-out-outline" size={24} color="#fff" />
-        <Text style={styles.logoutButtonText}>Déconnexion</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.version}>Version 1.0.0 - Invisible Queue</Text>
-    </ScrollView>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={[styles.infoValue, valueColor ? { color: valueColor } : {}]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  header: {
+  safe: { flex: 1, backgroundColor: '#0F1C3F' },
+  container: { flexGrow: 1, backgroundColor: '#F7F9FC', paddingBottom: 40 },
+
+  hero: {
+    backgroundColor: '#0F1C3F',
     alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 20,
+    paddingTop: 36,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginTop: 10,
+  avatarCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#1A73E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#1A73E8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  avatarText: { fontSize: 32, fontWeight: '800', color: '#FFFFFF' },
+  heroName: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 5,
+  },
+  heroBadgeText: { fontSize: 13, fontWeight: '700' },
+
+  section: { paddingHorizontal: 20, marginTop: 28 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A94A6',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+    marginLeft: 4,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
     elevation: 3,
   },
+  cardDivider: { height: 1, backgroundColor: '#F0F2F8', marginLeft: 56 },
+
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    width: 60,
-    marginLeft: 8,
+  infoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  info: {
-    fontSize: 16,
-    color: '#666',
-    flex: 1,
-  },
-  logoutButton: {
-    backgroundColor: '#e74c3c',
+  infoLabel: { fontSize: 15, color: '#4A5568', fontWeight: '500', width: 64 },
+  infoValue: { flex: 1, fontSize: 15, color: '#0F1C3F', fontWeight: '600', textAlign: 'right' },
+
+  guestInfo: { alignItems: 'center', padding: 24, gap: 12 },
+  guestTitle: { fontSize: 17, fontWeight: '700', color: '#0F1C3F', textAlign: 'center' },
+  guestText: { fontSize: 14, color: '#8A94A6', textAlign: 'center', lineHeight: 21 },
+
+  logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 20,
+    backgroundColor: '#E74C3C',
+    marginHorizontal: 20,
+    marginTop: 32,
+    paddingVertical: 15,
+    borderRadius: 16,
+    shadowColor: '#E74C3C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  logoutButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  version: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 40,
-    fontSize: 12,
-  },
+  logoutBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  footerNote: { textAlign: 'center', color: '#C5CDE0', fontSize: 12, marginTop: 28 },
 });
