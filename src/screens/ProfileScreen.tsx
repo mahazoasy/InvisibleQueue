@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import Gravatar from 'react-native-avatar-gravatar';
+import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -17,21 +16,7 @@ import md5 from 'md5';
 
 export default function ProfileScreen() {
   const { user, isGuest, signOut } = useAuth();
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isGuest && user?.email) {
-      // 1. Vérifier si une photo existe déjà dans Supabase (ex: connexion Google)
-      const supabaseAvatar = user.user_metadata?.avatar_url;
-      if (supabaseAvatar) {
-        setAvatarUrl(supabaseAvatar);
-      } else {
-        // 2. Sinon, utiliser Gravatar
-        const emailHash = md5(user.email.trim().toLowerCase());
-        setAvatarUrl(`https://www.gravatar.com/avatar/${emailHash}?d=identicon&s=200`);
-      }
-    }
-  }, [user, isGuest]);
+  const [avatarError, setAvatarError] = useState(false);
 
   const handleSignOut = async () => {
     Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -53,32 +38,50 @@ export default function ProfileScreen() {
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur';
 
+  // Génération de l'URL Gravatar
+  let gravatarUrl = null;
+  if (user?.email) {
+    const emailHash = md5(user.email.trim().toLowerCase());
+    gravatarUrl = `https://www.gravatar.com/avatar/${emailHash}?d=identicon&s=200`;
+    console.log('URL Gravatar générée :', gravatarUrl); // Vérifie le hash dans la console
+  }
+
+  const renderAvatar = () => {
+    if (isGuest) {
+      return <Ionicons name="person-outline" size={36} color="#FFFFFF" />;
+    }
+    if (gravatarUrl && !avatarError) {
+      return (
+        <Image
+          source={{ uri: gravatarUrl }}
+          style={styles.avatarImage}
+          onError={() => {
+            console.log('Erreur chargement image');
+            setAvatarError(true);
+          }}
+        />
+      );
+    }
+    // Fallback : initiales
+    return (
+      <Text style={styles.avatarText}>
+        {displayName
+          .split(' ')
+          .map((w: string) => w[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase()}
+      </Text>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0F1C3F" />
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-
-        {/* Hero Header */}
         <View style={styles.hero}>
-          <View style={styles.avatarCircle}>
-            {isGuest ? (
-              <Ionicons name="person-outline" size={36} color="#FFFFFF" />
-            ) : avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarText}>
-                {displayName
-                  .split(' ')
-                  .map((w: string) => w[0])
-                  .join('')
-                  .substring(0, 2)
-                  .toUpperCase()}
-              </Text>
-            )}
-          </View>
-          <Text style={styles.heroName}>
-            {isGuest ? 'Mode Invité' : displayName}
-          </Text>
+          <View style={styles.avatarCircle}>{renderAvatar()}</View>
+          <Text style={styles.heroName}>{isGuest ? 'Mode Invité' : displayName}</Text>
           <View style={styles.heroBadge}>
             <Ionicons
               name={isGuest ? 'walk-outline' : 'checkmark-circle'}
@@ -91,7 +94,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Info Card (inchangée) */}
+        {/* Info Card */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
           <View style={styles.card}>
