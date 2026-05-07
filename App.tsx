@@ -9,7 +9,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import CreateQueueScreen from './src/screens/CreateQueueScreen';
 import ActiveQueueScreen from './src/screens/ActiveQueueScreen';
 import ManageQueueScreen from './src/screens/ManageQueueScreen';
-import { Ionicons } from '@expo/vector-icons'; 
+import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -23,13 +24,55 @@ export type RootStackParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
 
+const BRAND = '#1A73E8';
+const DARK = '#0F1C3F';
+const GRAY = '#8A94A6';
+
+const headerOptions = {
+  headerStyle: { backgroundColor: '#FFFFFF', elevation: 0, shadowOpacity: 0 },
+  headerTintColor: DARK,
+  headerTitleStyle: { fontWeight: '700' as const, fontSize: 17, color: DARK },
+  headerBackTitleVisible: false,
+  headerBackImage: () => (
+    <Ionicons name="chevron-back" size={24} color={DARK} style={{ marginLeft: 8 }} />
+  ),
+};
+
 function HomeStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Files à proximité' }} />
-      <Stack.Screen name="CreateQueue" component={CreateQueueScreen} options={{ title: 'Créer une file' }} />
-      <Stack.Screen name="ActiveQueue" component={ActiveQueueScreen} options={{ title: 'Ma position' }} />
-      <Stack.Screen name="ManageQueue" component={ManageQueueScreen} options={{ title: 'Gérer la file' }} />
+    <Stack.Navigator screenOptions={headerOptions}>
+      <Stack.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: 'Files à proximité',
+          headerLeft: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
+              <Ionicons name="time" size={20} color={BRAND} style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 17, fontWeight: '800', color: DARK }}>Invisible Queue</Text>
+            </View>
+          ),
+          headerTitle: () => null,
+        }}
+      />
+      <Stack.Screen
+        name="CreateQueue"
+        component={CreateQueueScreen}
+        options={{ title: 'Nouvelle file' }}
+      />
+      <Stack.Screen
+        name="ActiveQueue"
+        component={ActiveQueueScreen}
+        options={{ title: 'Ma position', headerBackTitle: '' }}
+      />
+      <Stack.Screen
+        name="ManageQueue"
+        component={ManageQueueScreen}
+        options={({ route }) => ({
+          title: route.params?.queueName || 'Gestion',
+          headerBackTitle: '',
+        })}
+      />
     </Stack.Navigator>
   );
 }
@@ -39,37 +82,48 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'home';
-          if (route.name === 'Files') iconName = focused ? 'list' : 'list-outline';
-          else if (route.name === 'Profil') iconName = focused ? 'person' : 'person-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+          const icons: Record<string, { active: string; inactive: string }> = {
+            Files: { active: 'list', inactive: 'list-outline' },
+            Profil: { active: 'person', inactive: 'person-outline' },
+          };
+          const cfg = icons[route.name] || { active: 'home', inactive: 'home-outline' };
+          return <Ionicons name={(focused ? cfg.active : cfg.inactive) as any} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#3498db',
-        tabBarInactiveTintColor: 'gray',
-        headerShown: false, 
+        tabBarActiveTintColor: BRAND,
+        tabBarInactiveTintColor: GRAY,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E8EBF2',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 4,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        headerShown: false,
       })}
     >
-      <Tab.Screen name="Files" component={HomeStack} />
-      <Tab.Screen name="Profil" component={ProfileScreen} />
+      <Tab.Screen name="Files" component={HomeStack} options={{ tabBarLabel: 'Files' }} />
+      <Tab.Screen name="Profil" component={ProfileScreen} options={{ tabBarLabel: 'Profil', headerShown: true, headerTitle: 'Mon profil', ...headerOptions }} />
     </Tab.Navigator>
   );
 }
 
 function AppNavigator() {
   const { user, loading, isGuest } = useAuth();
-
   if (loading) return null;
-
-  const showLogin = !user && !isGuest;
-
-  if (showLogin) {
+  if (!user && !isGuest) {
     return (
       <Stack.Navigator>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );
   }
-
   return <AppTabs />;
 }
 
