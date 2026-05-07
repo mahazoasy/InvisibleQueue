@@ -30,6 +30,7 @@
     "react-native-url-polyfill": "^3.0.0"
   },
   "devDependencies": {
+    "@types/md5": "^2.3.6",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
     "typescript": "~5.9.2"

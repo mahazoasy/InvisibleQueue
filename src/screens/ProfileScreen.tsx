@@ -68,7 +68,7 @@ export default function ProfileScreen() {
               <Text style={styles.avatarText}>
                 {displayName
                   .split(' ')
-                  .map(w => w[0])
+                  .map((w: string) => w[0])
                   .join('')
                   .substring(0, 2)
                   .toUpperCase()}
