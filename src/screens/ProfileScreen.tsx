@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -8,12 +8,29 @@ import {
   Alert,
   ScrollView,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import md5 from 'md5';
 
 export default function ProfileScreen() {
-  const { user, isGuest, signOut, isAuthenticated } = useAuth();
+  const { user, isGuest, signOut } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isGuest && user?.email) {
+      // 1. Vérifier si une photo existe déjà dans Supabase (ex: connexion Google)
+      const supabaseAvatar = user.user_metadata?.avatar_url;
+      if (supabaseAvatar) {
+        setAvatarUrl(supabaseAvatar);
+      } else {
+        // 2. Sinon, utiliser Gravatar
+        const emailHash = md5(user.email.trim().toLowerCase());
+        setAvatarUrl(`https://www.gravatar.com/avatar/${emailHash}?d=identicon&s=200`);
+      }
+    }
+  }, [user, isGuest]);
 
   const handleSignOut = async () => {
     Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -34,12 +51,6 @@ export default function ProfileScreen() {
 
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur';
-  const initials = displayName
-    .split(' ')
-    .map((w: string) => w[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase();
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -51,8 +62,17 @@ export default function ProfileScreen() {
           <View style={styles.avatarCircle}>
             {isGuest ? (
               <Ionicons name="person-outline" size={36} color="#FFFFFF" />
+            ) : avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
+              <Text style={styles.avatarText}>
+                {displayName
+                  .split(' ')
+                  .map(w => w[0])
+                  .join('')
+                  .substring(0, 2)
+                  .toUpperCase()}
+              </Text>
             )}
           </View>
           <Text style={styles.heroName}>
@@ -70,7 +90,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Info Card */}
+        {/* Info Card (inchangée) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations</Text>
           <View style={styles.card}>
@@ -79,7 +99,8 @@ export default function ProfileScreen() {
                 <Ionicons name="information-circle-outline" size={40} color="#F39C12" />
                 <Text style={styles.guestTitle}>Navigation en mode invité</Text>
                 <Text style={styles.guestText}>
-                  Créez un compte pour accéder à toutes les fonctionnalités : création de files, historique de vos passages et bien plus.
+                  Créez un compte pour accéder à toutes les fonctionnalités : création de files,
+                  historique de vos passages et bien plus.
                 </Text>
               </View>
             ) : (
@@ -148,7 +169,6 @@ function InfoRow({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#0F1C3F' },
   container: { flexGrow: 1, backgroundColor: '#F7F9FC', paddingBottom: 40 },
-
   hero: {
     backgroundColor: '#0F1C3F',
     alignItems: 'center',
@@ -169,6 +189,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 10,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
   },
   avatarText: { fontSize: 32, fontWeight: '800', color: '#FFFFFF' },
   heroName: {
@@ -188,7 +214,6 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   heroBadgeText: { fontSize: 13, fontWeight: '700' },
-
   section: { paddingHorizontal: 20, marginTop: 28 },
   sectionTitle: {
     fontSize: 12,
@@ -210,7 +235,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardDivider: { height: 1, backgroundColor: '#F0F2F8', marginLeft: 56 },
-
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -228,11 +252,9 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: 15, color: '#4A5568', fontWeight: '500', width: 64 },
   infoValue: { flex: 1, fontSize: 15, color: '#0F1C3F', fontWeight: '600', textAlign: 'right' },
-
   guestInfo: { alignItems: 'center', padding: 24, gap: 12 },
   guestTitle: { fontSize: 17, fontWeight: '700', color: '#0F1C3F', textAlign: 'center' },
   guestText: { fontSize: 14, color: '#8A94A6', textAlign: 'center', lineHeight: 21 },
-
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
