@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Gravatar from 'react-native-avatar-gravatar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
