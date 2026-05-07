@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -9,7 +9,6 @@ import {
   Alert,
   StatusBar,
   ActivityIndicator,
-  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase, QueueEntry } from '../services/supabase';
@@ -28,10 +27,40 @@ export default function ManageQueueScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [servedCount, setServedCount] = useState(0);
 
+  const deleteRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    deleteRef.current = () => {
+      Alert.alert(
+        'Supprimer la file',
+        `Voulez-vous supprimer définitivement "${queueName}" ? Toutes les personnes en attente seront retirées.`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await supabase.from('queue_entries').delete().eq('queue_id', queueId);
+                await supabase.from('queues').delete().eq('id', queueId);
+                navigation.replace('Home');
+              } catch (error: any) {
+                Alert.alert('Erreur', error.message);
+              }
+            },
+          },
+        ]
+      );
+    };
+  }, [queueId, queueName, navigation]);
+
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={handleDeleteQueue} style={{ marginRight: 16 }}>
+        <TouchableOpacity
+          onPress={() => deleteRef.current()}
+          style={{ marginRight: 16 }}
+        >
           <Ionicons name="trash-outline" size={22} color="#E74C3C" />
         </TouchableOpacity>
       ),
@@ -41,9 +70,28 @@ export default function ManageQueueScreen({ route }: Props) {
   useEffect(() => {
     fetchEntries();
     fetchServedCount();
-    const unsub = subscribeToQueue();
-    return unsub;
-  }, []);
+
+    const channel = supabase
+      .channel(`manage_${queueId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'queue_entries',
+          filter: `queue_id=eq.${queueId}`,
+        },
+        () => {
+          fetchEntries();
+          fetchServedCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [queueId]);
 
   const fetchEntries = async () => {
     const { data, error } = await supabase
@@ -65,22 +113,6 @@ export default function ManageQueueScreen({ route }: Props) {
     setServedCount(count || 0);
   };
 
-  const subscribeToQueue = () => {
-    const subscription = supabase
-      .channel(`manage_${queueId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'queue_entries',
-        filter: `queue_id=eq.${queueId}`,
-      }, () => {
-        fetchEntries();
-        fetchServedCount();
-      })
-      .subscribe();
-    return () => subscription.unsubscribe();
-  };
-
   const handleServe = (entryId: string, displayName: string) => {
     Alert.alert(
       'Confirmer',
@@ -90,14 +122,17 @@ export default function ManageQueueScreen({ route }: Props) {
         {
           text: 'Servi ✓',
           onPress: async () => {
-            await supabase.from('queue_entries').update({ status: 'served' }).eq('id', entryId);
+            await supabase
+              .from('queue_entries')
+              .update({ status: 'served' })
+              .eq('id', entryId);
           },
         },
       ]
     );
   };
 
-  const handleMissed = async (entryId: string, displayName: string) => {
+  const handleMissed = (entryId: string, displayName: string) => {
     Alert.alert(
       'Absent',
       `${displayName} n'est pas présent(e) ?`,
@@ -115,29 +150,6 @@ export default function ManageQueueScreen({ route }: Props) {
     );
   };
 
-  const handleDeleteQueue = () => {
-    Alert.alert(
-      'Supprimer la file',
-      `Voulez-vous supprimer définitivement "${queueName}" ? Toutes les personnes en attente seront retirées.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await supabase.from('queue_entries').delete().eq('queue_id', queueId);
-              await supabase.from('queues').delete().eq('id', queueId);
-              navigation.replace('Home');
-            } catch (error: any) {
-              Alert.alert('Erreur', error.message);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const getMissedColor = (missed: number) => {
     if (missed === 0) return '#2ECC71';
     if (missed === 1) return '#F39C12';
@@ -147,8 +159,8 @@ export default function ManageQueueScreen({ route }: Props) {
 
   const renderEntry = ({ item, index }: { item: QueueEntry; index: number }) => (
     <View style={[styles.entryCard, index === 0 && styles.entryCardFirst]}>
-      {/* Position badge + Info */}
       <View style={styles.entryLeft}>
+        {/* Badge position */}
         <View style={[styles.positionBadge, index === 0 && styles.positionBadgeFirst]}>
           {index === 0 ? (
             <Ionicons name="star" size={14} color="#FFFFFF" />
@@ -156,23 +168,34 @@ export default function ManageQueueScreen({ route }: Props) {
             <Text style={styles.positionText}>{index + 1}</Text>
           )}
         </View>
+
+        {/* Infos utilisateur */}
         <View style={styles.entryInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{item.display_name}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.display_name}
+            </Text>
             {index === 0 && (
               <View style={styles.nextBadge}>
                 <Text style={styles.nextBadgeText}>Prochain</Text>
               </View>
             )}
           </View>
-          <Text style={styles.email} numberOfLines={1}>{item.email}</Text>
+          <Text style={styles.email} numberOfLines={1}>
+            {item.email}
+          </Text>
           <View style={styles.missedRow}>
             {[0, 1, 2].map((i) => (
               <View
                 key={i}
                 style={[
                   styles.missedDot,
-                  { backgroundColor: i < item.missed_count ? getMissedColor(item.missed_count) : '#E0E5F0' },
+                  {
+                    backgroundColor:
+                      i < item.missed_count
+                        ? getMissedColor(item.missed_count)
+                        : '#E0E5F0',
+                  },
                 ]}
               />
             ))}
@@ -183,7 +206,7 @@ export default function ManageQueueScreen({ route }: Props) {
         </View>
       </View>
 
-      {/* Action Buttons */}
+      {/* Boutons d'action */}
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.serveBtn}
@@ -204,11 +227,11 @@ export default function ManageQueueScreen({ route }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor="#0F1C3F" />
       <View style={styles.container}>
 
-        {/* Stats Bar */}
+        {/* Barre de statistiques */}
         <View style={styles.statsBar}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{waitingEntries.length}</Text>
@@ -228,7 +251,6 @@ export default function ManageQueueScreen({ route }: Props) {
           </View>
         </View>
 
-        {/* Next to serve label */}
         {waitingEntries.length > 0 && (
           <Text style={styles.sectionLabel}>File d'attente</Text>
         )}
@@ -267,13 +289,17 @@ const styles = StyleSheet.create({
   statsBar: {
     flexDirection: 'row',
     backgroundColor: '#0F1C3F',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 20,
   },
   statItem: { flex: 1, alignItems: 'center' },
   statValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  statLabel: { fontSize: 11, color: '#8A94A6', marginTop: 2, fontWeight: '500' },
-  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 4 },
+  statLabel: { fontSize: 11, color: '#8A94A6', marginTop: 3, fontWeight: '500' },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginHorizontal: 4,
+  },
 
   sectionLabel: {
     fontSize: 12,
@@ -321,13 +347,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  positionBadgeFirst: {
-    backgroundColor: '#1A73E8',
-  },
+  positionBadgeFirst: { backgroundColor: '#1A73E8' },
   positionText: { fontSize: 16, fontWeight: '800', color: '#4A5568' },
 
   entryInfo: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
   name: { fontSize: 15, fontWeight: '700', color: '#0F1C3F', flex: 1 },
   nextBadge: {
     backgroundColor: '#EEF4FF',
@@ -370,10 +399,26 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
   loadingText: { fontSize: 15, color: '#8A94A6', fontWeight: '500' },
 
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40, gap: 12 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    gap: 12,
+  },
   emptyTitle: { fontSize: 22, fontWeight: '800', color: '#0F1C3F' },
-  emptySubtitle: { fontSize: 14, color: '#8A94A6', textAlign: 'center', lineHeight: 20 },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#8A94A6',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });
