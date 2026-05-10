@@ -28,6 +28,7 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
   const [lastNotifiedThreshold, setLastNotifiedThreshold] = useState<number>(0);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const notifAnim = useRef(new Animated.Value(-100)).current;
@@ -126,8 +127,8 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
               Alert.alert(
                 'File terminée',
                 newEntry.status === 'served'
-                  ? '✅ C\'est votre tour ! Vous avez été servi.'
-                  : '❌ Vous avez été exclu après 3 retards.'
+                  ? 'C\'est votre tour ! Vous avez été servi.'
+                  : 'Vous avez été exclu après 3 retards.'
               );
               await clearActiveEntry();
               navigation.replace('Home');
@@ -152,6 +153,58 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
         },
       },
     ]);
+  };
+
+  // Nouvelle fonction : marquer comme servi (son tour est passé)
+  const handleServed = () => {
+    Alert.alert(
+      'Confirmer',
+      'Avez-vous bien été servi(e) ? Cela retirera votre place de la file.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Oui, servi',
+          onPress: async () => {
+            setActionLoading(true);
+            const { error } = await supabase
+              .from('queue_entries')
+              .update({ status: 'served' })
+              .eq('id', entryId);
+            setActionLoading(false);
+            if (error) {
+              Alert.alert('Erreur', error.message);
+            } else {
+              await clearActiveEntry();
+              navigation.replace('Home');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Nouvelle fonction : reculer volontairement à la fin de la file
+  const handleMoveToBack = () => {
+    Alert.alert(
+      'Reculer dans la file',
+      'Voulez-vous vraiment passer en dernière position ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Oui, reculer',
+          onPress: async () => {
+            setActionLoading(true);
+            const { error } = await supabase.rpc('move_to_back', { entry_id: entryId });
+            setActionLoading(false);
+            if (error) {
+              Alert.alert('Erreur', error.message);
+            } else {
+              Alert.alert('Succès', 'Vous avez été déplacé à la fin de la file.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getEstimatedWait = (pos: number) => {
@@ -269,6 +322,29 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
 
         <View style={styles.spacer} />
 
+        {/* Nouveaux boutons d'action */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.servedBtn, actionLoading && styles.actionDisabled]}
+            onPress={handleServed}
+            disabled={actionLoading}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.actionBtnText}>J'ai été servi</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.backBtn, actionLoading && styles.actionDisabled]}
+            onPress={handleMoveToBack}
+            disabled={actionLoading}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="return-down-back-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.actionBtnText}>Reculer en fin de file</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveQueue} activeOpacity={0.85}>
           <Ionicons name="exit-outline" size={20} color="#E74C3C" style={{ marginRight: 8 }} />
           <Text style={styles.leaveBtnText}>Quitter la file</Text>
@@ -372,6 +448,38 @@ const styles = StyleSheet.create({
   },
   infoNoteText: { flex: 1, fontSize: 13, color: '#8A94A6', lineHeight: 18 },
   spacer: { flex: 1 },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  servedBtn: {
+    backgroundColor: '#2ECC71',
+  },
+  backBtn: {
+    backgroundColor: '#F39C12',
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionDisabled: {
+    opacity: 0.6,
+  },
   leaveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
