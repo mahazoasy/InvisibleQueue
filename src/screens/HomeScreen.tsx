@@ -242,14 +242,14 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={DARK_BG} />
 
-      {/* ── Header bleu nuit (même palette que LoginScreen) ─────────────── */}
+      {/* ── Header bleu nuit ─── */}
       <Animated.View
         style={[
           styles.header,
           { opacity: headerOpacity, transform: [{ translateY: headerAnim }] },
         ]}
       >
-        {/* Cercles décoratifs (identiques au splash/login) */}
+        {/* Cercles décoratifs */}
         <View style={styles.headerCircle1} />
         <View style={styles.headerCircle2} />
 
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   list: { padding: 16, paddingTop: 20, paddingBottom: 100 },
 
-  // ── Loading ────────
+  // ── chargement ────────
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   loadingCard: {
     backgroundColor: CARD_BG,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: GRAY, fontSize: 15, fontWeight: '500' },
 
-  // ── Empty ───────
+  // ── lorsque vide ───────
   emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
   emptyIconWrap: {
     width: 72,
