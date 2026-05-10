@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Animated,
+  ScrollView, 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -97,7 +98,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
       setPosition(pos);
       setTotalWaiting(waitingEntries.length);
 
-      // Notifications selon le nombre de personnes devant
       if (currentEntry.status === 'waiting') {
         if (pos <= 3 && lastNotifiedThreshold !== 3) {
           setNotification(`⚡ Vous êtes en position ${pos} — Préparez-vous !`);
@@ -127,8 +127,8 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
               Alert.alert(
                 'File terminée',
                 newEntry.status === 'served'
-                  ? 'C\'est votre tour ! Vous avez été servi.'
-                  : 'Vous avez été exclu après 3 retards.'
+                  ? '✅ C\'est votre tour ! Vous avez été servi.'
+                  : '❌ Vous avez été exclu après 3 retards.'
               );
               await clearActiveEntry();
               navigation.replace('Home');
@@ -155,7 +155,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
     ]);
   };
 
-  // Nouvelle fonction : marquer comme servi (son tour est passé)
   const handleServed = () => {
     Alert.alert(
       'Confirmer',
@@ -183,7 +182,6 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
     );
   };
 
-  // Nouvelle fonction : reculer volontairement à la fin de la file
   const handleMoveToBack = () => {
     Alert.alert(
       'Reculer dans la file',
@@ -267,96 +265,105 @@ export default function ActiveQueueScreen({ route, navigation }: Props) {
         </Animated.View>
       )}
 
-      <View style={styles.container}>
-        <View style={styles.queueHeader}>
-          <Text style={styles.queueName} numberOfLines={2}>{queue?.name}</Text>
-          <View style={styles.waitingBadge}>
-            <Ionicons name="people-outline" size={14} color="#1A73E8" />
-            <Text style={styles.waitingBadgeText}>{totalWaiting} en attente</Text>
-          </View>
-        </View>
-
-        <Animated.View style={[styles.positionCard, { transform: [{ scale: pulseAnim }], borderColor: posColor }]}>
-          <Text style={styles.positionLabel}>Votre position</Text>
-          <Text style={[styles.positionNumber, { color: posColor }]}>{position}</Text>
-          <Text style={styles.positionSub}>sur {totalWaiting} personne{totalWaiting > 1 ? 's' : ''}</Text>
-        </Animated.View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Ionicons name="people-outline" size={22} color="#1A73E8" />
-            <Text style={styles.statValue}>{Math.max(0, (position ?? 1) - 1)}</Text>
-            <Text style={styles.statLabel}>devant vous</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCard}>
-            <Ionicons name="time-outline" size={22} color="#1A73E8" />
-            <Text style={styles.statValue}>{getEstimatedWait(position ?? 1)}</Text>
-            <Text style={styles.statLabel}>attente estimée</Text>
-          </View>
-        </View>
-
-        {totalWaiting > 0 && (
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressLabel}>Progression de la file</Text>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.max(5, ((totalWaiting - (position ?? 1) + 1) / totalWaiting) * 100)}%`,
-                    backgroundColor: posColor,
-                  },
-                ]}
-              />
+      {/* le View standard par ScrollView */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.queueHeader}>
+            <Text style={styles.queueName} numberOfLines={2}>{queue?.name}</Text>
+            <View style={styles.waitingBadge}>
+              <Ionicons name="people-outline" size={14} color="#1A73E8" />
+              <Text style={styles.waitingBadgeText}>{totalWaiting} en attente</Text>
             </View>
           </View>
-        )}
 
-        <View style={styles.infoNote}>
-          <Ionicons name="information-circle-outline" size={16} color="#8A94A6" />
-          <Text style={styles.infoNoteText}>
-            Restez à proximité. Vous serez notifié à l'approche de votre tour.
-          </Text>
-        </View>
+          <Animated.View style={[styles.positionCard, { transform: [{ scale: pulseAnim }], borderColor: posColor }]}>
+            <Text style={styles.positionLabel}>Votre position</Text>
+            <Text style={[styles.positionNumber, { color: posColor }]}>{position}</Text>
+            <Text style={styles.positionSub}>sur {totalWaiting} personne{totalWaiting > 1 ? 's' : ''}</Text>
+          </Animated.View>
 
-        <View style={styles.spacer} />
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Ionicons name="people-outline" size={22} color="#1A73E8" />
+              <Text style={styles.statValue}>{Math.max(0, (position ?? 1) - 1)}</Text>
+              <Text style={styles.statLabel}>devant vous</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statCard}>
+              <Ionicons name="time-outline" size={22} color="#1A73E8" />
+              <Text style={styles.statValue}>{getEstimatedWait(position ?? 1)}</Text>
+              <Text style={styles.statLabel}>attente estimée</Text>
+            </View>
+          </View>
 
-        {/* Nouveaux boutons d'action */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.servedBtn, actionLoading && styles.actionDisabled]}
-            onPress={handleServed}
-            disabled={actionLoading}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.actionBtnText}>J'ai été servi</Text>
+          {totalWaiting > 0 && (
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressLabel}>Progression de la file</Text>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${Math.max(5, ((totalWaiting - (position ?? 1) + 1) / totalWaiting) * 100)}%`,
+                      backgroundColor: posColor,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          )}
+
+          <View style={styles.infoNote}>
+            <Ionicons name="information-circle-outline" size={16} color="#8A94A6" />
+            <Text style={styles.infoNoteText}>
+              Restez à proximité. Vous serez notifié à l'approche de votre tour.
+            </Text>
+          </View>
+
+          {/* Les boutons */}
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.servedBtn, actionLoading && styles.actionDisabled]}
+              onPress={handleServed}
+              disabled={actionLoading}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.actionBtnText}>J'ai été servi</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.backBtn, actionLoading && styles.actionDisabled]}
+              onPress={handleMoveToBack}
+              disabled={actionLoading}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="return-down-back-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.actionBtnText}>Reculer en fin de file</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveQueue} activeOpacity={0.85}>
+            <Ionicons name="exit-outline" size={20} color="#E74C3C" style={{ marginRight: 8 }} />
+            <Text style={styles.leaveBtnText}>Quitter la file</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.backBtn, actionLoading && styles.actionDisabled]}
-            onPress={handleMoveToBack}
-            disabled={actionLoading}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="return-down-back-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.actionBtnText}>Reculer en fin de file</Text>
-          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.leaveBtn} onPress={handleLeaveQueue} activeOpacity={0.85}>
-          <Ionicons name="exit-outline" size={20} color="#E74C3C" style={{ marginRight: 8 }} />
-          <Text style={styles.leaveBtnText}>Quitter la file</Text>
-        </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F7F9FC' },
-  container: { flex: 1, padding: 20 },
+
+  // le ScrollView
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+
+  container: { padding: 20 }, 
+
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   loadingText: { fontSize: 15, color: '#8A94A6', fontWeight: '500' },
   statusContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
@@ -447,12 +454,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   infoNoteText: { flex: 1, fontSize: 13, color: '#8A94A6', lineHeight: 18 },
-  spacer: { flex: 1 },
+
   actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
+    marginTop: 12,
   },
   actionBtn: {
     flex: 1,
@@ -466,20 +474,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  servedBtn: {
-    backgroundColor: '#2ECC71',
-  },
-  backBtn: {
-    backgroundColor: '#F39C12',
-  },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  actionDisabled: {
-    opacity: 0.6,
-  },
+  servedBtn: { backgroundColor: '#2ECC71' },
+  backBtn: { backgroundColor: '#F39C12' },
+  actionBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  actionDisabled: { opacity: 0.6 },
   leaveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -489,6 +487,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#E74C3C',
     backgroundColor: '#FFF5F5',
+    marginBottom: 10,
   },
   leaveBtnText: { color: '#E74C3C', fontSize: 16, fontWeight: '700' },
 });
