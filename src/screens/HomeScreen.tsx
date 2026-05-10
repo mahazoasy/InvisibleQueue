@@ -214,7 +214,11 @@ export default function HomeScreen({ navigation }: Props) {
     navigation.navigate('ActiveQueue', { entryId: newEntry.id, queueId: target.id });
   };
 
-  const renderQueueCard = ({ item, index }: { item: QueueWithCount; index: number }) => (
+  const renderQueueCard = ({ item, index }: { item: QueueWithCount; index: number }) => {
+  // Vérifier si l'utilisateur connecté est le créateur de cette file
+  const isCreator = isAuthenticated && user?.id === item.created_by;
+
+  return (
     <Animated.View
       style={{
         opacity: fadeAnim,
@@ -226,10 +230,13 @@ export default function HomeScreen({ navigation }: Props) {
       <QueueCard
         queue={item}
         onPress={() => openJoinModal(item)}
+        onManage={isCreator ? () => navigation.navigate('ManageQueue', { queueId: item.id, queueName: item.name }) : undefined}
         distance={location ? getDistance(location.latitude, location.longitude, item.latitude, item.longitude) : undefined}
+        isCreator={isCreator}
       />
     </Animated.View>
   );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

@@ -7,10 +7,12 @@ type QueueWithCount = Queue & { waitingCount: number };
 type QueueCardProps = {
   queue: QueueWithCount;
   onPress: () => void;
+  onManage?: () => void;      
   distance?: number;
+  isCreator?: boolean;        
 };
 
-export default function QueueCard({ queue, onPress, distance }: QueueCardProps) {
+export default function QueueCard({ queue, onPress, onManage, distance, isCreator }: QueueCardProps) {
   const getStatusConfig = (count: number) => {
     if (count === 0) return { color: '#2ECC71', bg: '#E8FAF0', label: 'Disponible', icon: 'checkmark-circle' };
     if (count < 5) return { color: '#F39C12', bg: '#FEF6E4', label: 'Affluence modérée', icon: 'time' };
@@ -36,7 +38,7 @@ export default function QueueCard({ queue, onPress, distance }: QueueCardProps) 
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      {/* Header */}
+      {/* En-tête */}
       <View style={styles.header}>
         <Text style={styles.name} numberOfLines={1}>{queue.name}</Text>
         <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
@@ -45,7 +47,7 @@ export default function QueueCard({ queue, onPress, distance }: QueueCardProps) 
         </View>
       </View>
 
-      {/* Stats Row */}
+      {/* Ligne de statistiques */}
       <View style={styles.statsRow}>
         <View style={styles.stat}>
           <View style={[styles.statIconWrap, { backgroundColor: '#EEF4FF' }]}>
@@ -54,9 +56,7 @@ export default function QueueCard({ queue, onPress, distance }: QueueCardProps) 
           <Text style={styles.statValue}>{queue.waitingCount}</Text>
           <Text style={styles.statLabel}>en attente</Text>
         </View>
-
         <View style={styles.statDivider} />
-
         <View style={styles.stat}>
           <View style={[styles.statIconWrap, { backgroundColor: '#FEF6E4' }]}>
             <Ionicons name="time-outline" size={16} color="#F39C12" />
@@ -64,9 +64,7 @@ export default function QueueCard({ queue, onPress, distance }: QueueCardProps) 
           <Text style={styles.statValue}>{getEstimatedWait(queue.waitingCount)}</Text>
           <Text style={styles.statLabel}>estimé</Text>
         </View>
-
         <View style={styles.statDivider} />
-
         <View style={styles.stat}>
           <View style={[styles.statIconWrap, { backgroundColor: '#E8FAF0' }]}>
             <Ionicons name="location-outline" size={16} color="#2ECC71" />
@@ -76,11 +74,19 @@ export default function QueueCard({ queue, onPress, distance }: QueueCardProps) 
         </View>
       </View>
 
-      {/* Join CTA */}
+      {/* Pied de carte */}
       <View style={styles.footer}>
         <View style={[styles.dot, { backgroundColor: status.color }]} />
-        <Text style={styles.footerText}>Appuyez pour rejoindre</Text>
-        <Ionicons name="chevron-forward" size={16} color="#C5CDE0" />
+        <Text style={styles.footerText}>
+          {isCreator ? 'Vous êtes le gestionnaire' : 'Appuyez pour rejoindre'}
+        </Text>
+        {isCreator && onManage && (
+          <TouchableOpacity onPress={onManage} style={styles.manageButton}>
+            <Text style={styles.manageButtonText}>Gérer</Text>
+            <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+        {!isCreator && <Ionicons name="chevron-forward" size={16} color="#C5CDE0" />}
       </View>
     </TouchableOpacity>
   );
@@ -120,7 +126,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statusText: { fontSize: 11, fontWeight: '700' },
-
   statsRow: {
     flexDirection: 'row',
     backgroundColor: '#F7F9FC',
@@ -139,7 +144,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 15, fontWeight: '800', color: '#0F1C3F' },
   statLabel: { fontSize: 11, color: '#8A94A6', fontWeight: '500' },
   statDivider: { width: 1, backgroundColor: '#E0E5F0', marginVertical: 4 },
-
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,4 +151,14 @@ const styles = StyleSheet.create({
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
   footerText: { flex: 1, fontSize: 13, color: '#8A94A6', fontWeight: '500' },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A73E8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  manageButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 });
