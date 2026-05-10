@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  ImageBackground,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +32,13 @@ type Props = { navigation: HomeScreenNavigationProp };
 const RADIUS_KM = 5;
 type QueueWithCount = Queue & { waitingCount: number };
 
+const DARK_BG   = '#0F1C3F';   
+const BRAND     = '#1A73E8';   
+const CARD_BG   = '#FFFFFF';
+const SURFACE   = '#F4F6FB';
+const GRAY      = '#8A94A6';
+const LIGHT_BG  = '#F7F9FC';
+
 export default function HomeScreen({ navigation }: Props) {
   const [queues, setQueues] = useState<QueueWithCount[]>([]);
   const [location, setLocation] = useState<Location.LocationObjectCoords | null>(null);
@@ -43,9 +51,16 @@ export default function HomeScreen({ navigation }: Props) {
   const [joining, setJoining] = useState(false);
   const { user, guestSessionId, isAuthenticated } = useAuth();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const headerAnim = React.useRef(new Animated.Value(-30)).current;
+  const headerOpacity = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     requestLocationPermission();
+    // Animation d'entrée du header
+    Animated.parallel([
+      Animated.timing(headerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(headerAnim, { toValue: 0, tension: 60, friction: 10, useNativeDriver: true }),
+    ]).start();
   }, []);
 
   useFocusEffect(
@@ -57,11 +72,7 @@ export default function HomeScreen({ navigation }: Props) {
   const requestLocationPermission = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert(
-        'Géolocalisation requise',
-        'Activez la localisation pour voir les files à proximité.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Géolocalisation requise', 'Activez la localisation pour voir les files à proximité.', [{ text: 'OK' }]);
       setLoading(false);
       return;
     }
@@ -75,12 +86,7 @@ export default function HomeScreen({ navigation }: Props) {
     else setLoading(true);
 
     const { data, error } = await supabase.from('queues').select('*');
-    if (error) {
-      console.error(error);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+    if (error) { setLoading(false); setRefreshing(false); return; }
 
     const filtered = data.filter(q =>
       getDistance(location.latitude, location.longitude, q.latitude, q.longitude) <= RADIUS_KM
@@ -100,27 +106,22 @@ export default function HomeScreen({ navigation }: Props) {
     setQueues(withCounts);
     setLoading(false);
     setRefreshing(false);
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    fadeAnim.setValue(0);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   };
 
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) ** 2;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  // ----- FONCTIONS CORRIGÉES -----
   const openJoinModal = async (queue: Queue) => {
     setSelectedQueue(queue);
     if (isAuthenticated) {
-      // Vérifier si l'utilisateur a déjà une entrée active dans cette file
-      const { data: existing, error } = await supabase
+      const { data: existing } = await supabase
         .from('queue_entries')
         .select('id')
         .eq('queue_id', queue.id)
@@ -129,14 +130,10 @@ export default function HomeScreen({ navigation }: Props) {
         .maybeSingle();
 
       if (existing) {
-        Alert.alert(
-          'Déjà inscrit',
-          'Vous êtes déjà dans cette file d\'attente.',
-          [
-            { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: queue.id }) },
-            { text: 'OK' }
-          ]
-        );
+        Alert.alert('Déjà inscrit', "Vous êtes déjà dans cette file d'attente.", [
+          { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: queue.id }) },
+          { text: 'OK' }
+        ]);
         return;
       }
       joinQueue(queue);
@@ -149,13 +146,11 @@ export default function HomeScreen({ navigation }: Props) {
     const target = queue || selectedQueue;
     if (!location || !target) return;
 
-    // Vérifier la distance
     if (getDistance(location.latitude, location.longitude, target.latitude, target.longitude) > RADIUS_KM) {
       Alert.alert('Trop loin', `Vous devez être à moins de ${RADIUS_KM} km pour rejoindre cette file.`);
       return;
     }
 
-    // Cas invité : vérifier si une entrée existe déjà via session_id
     if (!isAuthenticated) {
       const { data: existing } = await supabase
         .from('queue_entries')
@@ -166,22 +161,16 @@ export default function HomeScreen({ navigation }: Props) {
         .maybeSingle();
 
       if (existing) {
-        Alert.alert(
-          'Déjà inscrit',
-          'Vous êtes déjà dans cette file d\'attente.',
-          [
-            { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: target.id }) },
-            { text: 'OK' }
-          ]
-        );
+        Alert.alert('Déjà inscrit', "Vous êtes déjà dans cette file d'attente.", [
+          { text: 'Voir ma position', onPress: () => navigation.navigate('ActiveQueue', { entryId: existing.id, queueId: target.id }) },
+          { text: 'OK' }
+        ]);
         setJoinModalVisible(false);
         return;
       }
     }
 
-    const displayName = isAuthenticated
-      ? user?.user_metadata?.full_name || user?.email
-      : guestName.trim();
+    const displayName = isAuthenticated ? user?.user_metadata?.full_name || user?.email : guestName.trim();
     const email = isAuthenticated ? user?.email : guestEmail.trim();
 
     if (!displayName || !email) {
@@ -216,10 +205,7 @@ export default function HomeScreen({ navigation }: Props) {
       .single();
 
     setJoining(false);
-    if (error) {
-      Alert.alert('Erreur', error.message);
-      return;
-    }
+    if (error) { Alert.alert('Erreur', error.message); return; }
 
     await setActiveEntry(newEntry.id, target.id);
     setJoinModalVisible(false);
@@ -232,7 +218,9 @@ export default function HomeScreen({ navigation }: Props) {
     <Animated.View
       style={{
         opacity: fadeAnim,
-        transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+        transform: [{
+          translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [24 + index * 8, 0] })
+        }],
       }}
     >
       <QueueCard
@@ -244,25 +232,64 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7F9FC" />
-      <View style={styles.container}>
-        <View style={styles.infoBar}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={DARK_BG} />
+
+      {/* ── Header bleu nuit (même palette que LoginScreen) ─────────────── */}
+      <Animated.View
+        style={[
+          styles.header,
+          { opacity: headerOpacity, transform: [{ translateY: headerAnim }] },
+        ]}
+      >
+        {/* Cercles décoratifs (identiques au splash/login) */}
+        <View style={styles.headerCircle1} />
+        <View style={styles.headerCircle2} />
+
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerGreeting}>
+              {isAuthenticated
+                ? `Bonjour, ${user?.user_metadata?.full_name?.split(' ')[0] || 'vous'} 👋`
+                : 'Bienvenue 👋'}
+            </Text>
+            <Text style={styles.headerTitle}>Files à proximité</Text>
+          </View>
+          {isAuthenticated && (
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => navigation.navigate('CreateQueue')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Barre de localisation intégrée dans le header */}
+        <View style={styles.locationBar}>
           <View style={styles.locationPill}>
-            <Ionicons name="location" size={14} color="#1A73E8" />
+            <Ionicons name="location" size={13} color={BRAND} />
             <Text style={styles.locationText}>
               {location ? `Rayon ${RADIUS_KM} km` : 'Localisation...'}
             </Text>
           </View>
-          <Text style={styles.queueCount}>
-            {queues.length} file{queues.length !== 1 ? 's' : ''}
-          </Text>
+          <View style={styles.countPill}>
+            <Text style={styles.countText}>
+              {queues.length} file{queues.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
         </View>
+      </Animated.View>
 
+      {/* ── Corps de page (fond clair) ───────────────────────────────────── */}
+      <View style={styles.body}>
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1A73E8" />
-            <Text style={styles.loadingText}>Recherche des files à proximité...</Text>
+            <View style={styles.loadingCard}>
+              <ActivityIndicator size="large" color={BRAND} />
+              <Text style={styles.loadingText}>Recherche des files...</Text>
+            </View>
           </View>
         ) : (
           <FlatList
@@ -275,16 +302,19 @@ export default function HomeScreen({ navigation }: Props) {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Ionicons name="search-outline" size={56} color="#C5CDE0" />
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons name="search-outline" size={36} color={BRAND} />
+                </View>
                 <Text style={styles.emptyTitle}>Aucune file trouvée</Text>
                 <Text style={styles.emptySubtitle}>
-                  Aucune file d'attente dans un rayon de {RADIUS_KM} km.
+                  Aucune file d'attente dans un rayon de {RADIUS_KM} km autour de vous.
                 </Text>
                 {isAuthenticated && (
                   <TouchableOpacity
                     style={styles.createFromEmpty}
                     onPress={() => navigation.navigate('CreateQueue')}
                   >
+                    <Ionicons name="add-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
                     <Text style={styles.createFromEmptyText}>Créer une file</Text>
                   </TouchableOpacity>
                 )}
@@ -292,18 +322,9 @@ export default function HomeScreen({ navigation }: Props) {
             }
           />
         )}
-
-        {isAuthenticated && (
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={() => navigation.navigate('CreateQueue')}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="add" size={28} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
       </View>
 
+      {/* ── Modal rejoindre (invité) ─────────────────────────────────────── */}
       <Modal visible={joinModalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -311,26 +332,38 @@ export default function HomeScreen({ navigation }: Props) {
         >
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Rejoindre la file</Text>
-            <Text style={styles.modalQueueName}>{selectedQueue?.name}</Text>
+
+            {/* En-tête modal style login */}
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons name="enter-outline" size={22} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Rejoindre la file</Text>
+                <Text style={styles.modalQueueName} numberOfLines={1}>
+                  {selectedQueue?.name}
+                </Text>
+              </View>
+            </View>
 
             <View style={styles.inputGroup}>
-              <Ionicons name="person-outline" size={18} color="#8A94A6" style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={18} color={GRAY} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Votre nom"
-                placeholderTextColor="#8A94A6"
+                placeholderTextColor={GRAY}
                 value={guestName}
                 onChangeText={setGuestName}
                 autoCapitalize="words"
               />
             </View>
+
             <View style={styles.inputGroup}>
-              <Ionicons name="mail-outline" size={18} color="#8A94A6" style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={18} color={GRAY} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Votre email"
-                placeholderTextColor="#8A94A6"
+                placeholderTextColor={GRAY}
                 value={guestEmail}
                 onChangeText={setGuestEmail}
                 keyboardType="email-address"
@@ -348,7 +381,7 @@ export default function HomeScreen({ navigation }: Props) {
               ) : (
                 <>
                   <Ionicons name="enter-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.joinBtnText}>Rejoindre</Text>
+                  <Text style={styles.joinBtnText}>Rejoindre la file</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -364,70 +397,167 @@ export default function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F7F9FC' },
-  container: { flex: 1, backgroundColor: '#F7F9FC' },
-  infoBar: {
+  safe: { flex: 1, backgroundColor: DARK_BG },
+
+  header: {
+    backgroundColor: DARK_BG,
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 20,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  
+  headerCircle1: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(26, 115, 232, 0.1)',
+    top: -60,
+    right: -50,
+  },
+  headerCircle2: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(26, 115, 232, 0.07)',
+    bottom: -30,
+    left: -30,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+  },
+  headerGreeting: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.4,
+  },
+  createBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: BRAND,
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8EBF2',
+    justifyContent: 'center',
+    shadowColor: BRAND,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+    marginTop: 4,
+  },
+  locationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   locationPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF4FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(26, 115, 232, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(26, 115, 232, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    gap: 4,
+    gap: 5,
   },
-  locationText: { fontSize: 13, color: '#1A73E8', fontWeight: '600' },
-  queueCount: { fontSize: 13, color: '#8A94A6', fontWeight: '500' },
-  list: { padding: 16, paddingBottom: 90 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  loadingText: { color: '#8A94A6', fontSize: 15, fontWeight: '500' },
-  emptyContainer: { flex: 1, alignItems: 'center', paddingTop: 80, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#2C3E60', marginTop: 20, marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: '#8A94A6', textAlign: 'center', lineHeight: 20 },
-  createFromEmpty: {
-    marginTop: 24,
-    backgroundColor: '#1A73E8',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+  locationText: { fontSize: 13, color: '#6AABFF', fontWeight: '600' },
+  countPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  createFromEmptyText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#1A73E8',
+  countText: { fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: '600' },
+
+  // ── Body ───
+  body: {
+    flex: 1,
+    backgroundColor: LIGHT_BG,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    // Ombre de séparation header/body
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  list: { padding: 16, paddingTop: 20, paddingBottom: 100 },
+
+  // ── Loading ────────
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  loadingCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    gap: 16,
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  loadingText: { color: GRAY, fontSize: 15, fontWeight: '500' },
+
+  // ── Empty ───────
+  emptyContainer: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: '#EEF4FF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1A73E8',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 20,
   },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: DARK_BG, marginBottom: 8, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: GRAY, textAlign: 'center', lineHeight: 21 },
+  createFromEmpty: {
+    marginTop: 28,
+    backgroundColor: BRAND,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 14,
+    shadowColor: BRAND,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  createFromEmptyText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  // ── Modal ──────
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 28, 63, 0.5)',
+    backgroundColor: 'rgba(15, 28, 63, 0.6)',
   },
   modalSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BG,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 28,
-    paddingBottom: 40,
+    paddingBottom: 44,
   },
   modalHandle: {
     width: 40,
@@ -437,31 +567,52 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 24,
   },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#0F1C3F', marginBottom: 4 },
-  modalQueueName: { fontSize: 15, color: '#1A73E8', fontWeight: '600', marginBottom: 24 },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 24,
+  },
+  modalIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: BRAND,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: BRAND,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: DARK_BG },
+  modalQueueName: { fontSize: 13, color: BRAND, fontWeight: '600', marginTop: 2 },
   inputGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F6FB',
+    backgroundColor: SURFACE,
     borderRadius: 12,
     paddingHorizontal: 14,
     marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   inputIcon: { marginRight: 10 },
-  input: { flex: 1, height: 50, fontSize: 15, color: '#0F1C3F', fontWeight: '500' },
+  input: { flex: 1, height: 50, fontSize: 15, color: DARK_BG, fontWeight: '500' },
   joinBtn: {
-    backgroundColor: '#1A73E8',
+    backgroundColor: BRAND,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
     borderRadius: 14,
     marginTop: 6,
-    shadowColor: '#1A73E8',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: BRAND,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 6,
   },
   joinBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   cancelBtn: { alignItems: 'center', marginTop: 16, paddingVertical: 8 },

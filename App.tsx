@@ -10,7 +10,17 @@ import CreateQueueScreen from './src/screens/CreateQueueScreen';
 import ActiveQueueScreen from './src/screens/ActiveQueueScreen';
 import ManageQueueScreen from './src/screens/ManageQueueScreen';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, Image, StyleSheet, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  Animated,
+} from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+
+// On prévient l'auto-hide pour pouvoir le contrôler manuellement
+SplashScreen.preventAutoHideAsync();
 
 export type RootStackParamList = {
   Login: undefined;
@@ -92,7 +102,13 @@ function AppTabs() {
             Profil: { active: 'person', inactive: 'person-outline' },
           };
           const cfg = icons[route.name] || { active: 'home', inactive: 'home-outline' };
-          return <Ionicons name={(focused ? cfg.active : cfg.inactive) as any} size={size} color={color} />;
+          return (
+            <Ionicons
+              name={(focused ? cfg.active : cfg.inactive) as any}
+              size={size}
+              color={color}
+            />
+          );
         },
         tabBarActiveTintColor: BRAND,
         tabBarInactiveTintColor: GRAY,
@@ -134,55 +150,117 @@ function AppNavigator() {
   if (!user && !isGuest) {
     return (
       <Stack.Navigator>
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     );
   }
   return <AppTabs />;
 }
 
-// ─── Splash personalisé animé ─────────────────────────────────────────────
+// ─── Splash JS animé ──────────────────────────────────────────────────────────
+// Durée totale visible : ~2.5 secondes avant de passer à l'app
 const SPLASH_VISIBLE_MS = 2500;
 
 function CustomSplash({ onFinish }: { onFinish: () => void }) {
-  const logoScale = useRef(new Animated.Value(0.5)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale       = useRef(new Animated.Value(0.5)).current;
+  const logoOpacity     = useRef(new Animated.Value(0)).current;
+  const titleOpacity    = useRef(new Animated.Value(0)).current;
   const titleTranslateY = useRef(new Animated.Value(24)).current;
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
-  const bgOpacity = useRef(new Animated.Value(1)).current;
+  const bgOpacity       = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
+      // 1. Logo pop-in avec rebond
       Animated.parallel([
-        Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, tension: 55, friction: 7 }),
-        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(logoScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 55,
+          friction: 7,
+        }),
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
       ]),
+      // 2. Titre glisse vers le haut
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
-        Animated.timing(titleTranslateY, { toValue: 0, duration: 320, useNativeDriver: true }),
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 320,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslateY, {
+          toValue: 0,
+          duration: 320,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.timing(subtitleOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      // 3. Sous-titre fade-in
+      Animated.timing(subtitleOpacity, {
+        toValue: 1,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      // 4. Pause lisible
       Animated.delay(SPLASH_VISIBLE_MS - 1400),
-      Animated.timing(bgOpacity, { toValue: 0, duration: 380, useNativeDriver: true }),
+      // 5. Fondu de sortie
+      Animated.timing(bgOpacity, {
+        toValue: 0,
+        duration: 380,
+        useNativeDriver: true,
+      }),
     ]).start(() => onFinish());
   }, []);
 
   return (
     <Animated.View style={[styles.splashContainer, { opacity: bgOpacity }]}>
+      {/* Cercles décoratifs */}
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
-      <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 36 }}>
+
+      {/* Logo */}
+      <Animated.View
+        style={{
+          opacity: logoOpacity,
+          transform: [{ scale: logoScale }],
+          marginBottom: 36,
+        }}
+      >
         <View style={styles.logoCircle}>
-          <Image source={require('./assets/splash-icons.png')} style={styles.logoImage} resizeMode="contain" />
+          <Image
+            source={require('./assets/splash-icons.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
       </Animated.View>
-      <Animated.Text style={[styles.splashTitle, { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] }]}>
+
+      {/* Titre */}
+      <Animated.Text
+        style={[
+          styles.splashTitle,
+          {
+            opacity: titleOpacity,
+            transform: [{ translateY: titleTranslateY }],
+          },
+        ]}
+      >
         Invisible Queue
       </Animated.Text>
+
+      {/* Sous-titre */}
       <Animated.Text style={[styles.splashSubtitle, { opacity: subtitleOpacity }]}>
         Files d'attente virtuelles
       </Animated.Text>
+
+      {/* Points indicateurs en bas */}
       <Animated.View style={[styles.splashDots, { opacity: subtitleOpacity }]}>
         <View style={[styles.dot, styles.dotActive]} />
         <View style={styles.dot} />
@@ -192,8 +270,15 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
   );
 }
 
+// ─── App principale ───────────────────────────────────────────────────────────
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
+
+  useEffect(() => {
+    // On cache IMMÉDIATEMENT le splash natif Expo (l'écran gris avec les cercles)
+    // Notre splash JS prend le relai dès le premier render
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   if (!splashDone) {
     return <CustomSplash onFinish={() => setSplashDone(true)} />;
@@ -208,6 +293,7 @@ export default function App() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
