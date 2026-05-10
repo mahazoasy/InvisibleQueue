@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import MapView, { Marker, MapPressEvent, Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
@@ -23,37 +23,112 @@ import { RootStackParamList } from '../../App';
 type CreateQueueNavigationProp = StackNavigationProp<RootStackParamList, 'CreateQueue'>;
 type Props = { navigation: CreateQueueNavigationProp };
 
+const DISTANCE_LIMIT_METERS = 100; // L'utilisateur doit être à moins de 100m de l'emplacement choisi
+
+// Fonction de calcul de distance (formule de Haversine) – retourne la distance en mètres
+const haversineDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371e3; // Rayon terrestre en mètres
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
 export default function CreateQueueScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(true);
+  const [userPosition, setUserPosition] = useState<Location.LocationObjectCoords | null>(null);
   const { user } = useAuth();
+  const mapRef = useRef<MapView>(null);
 
+  // Demande de permission et suivi en temps réel
   useEffect(() => {
+    let watchSubscription: Location.LocationSubscription;
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-        setLocation(coords);
-        setRegion({ ...coords, latitudeDelta: 0.008, longitudeDelta: 0.008 });
-      } else {
+      if (status !== 'granted') {
         Alert.alert('Permission refusée', 'La géolocalisation est requise pour créer une file.');
         navigation.goBack();
+        return;
       }
+
+      // Position initiale
+      const initialPos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setUserPosition(initialPos.coords);
+      const coords = {
+        latitude: initialPos.coords.latitude,
+        longitude: initialPos.coords.longitude,
+      };
+      setLocation(coords);
+      setRegion({
+        ...coords,
+        latitudeDelta: 0.002,
+        longitudeDelta: 0.002,
+      });
       setLocating(false);
+
+      // Surveillance en temps réel
+      watchSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 3000,
+          distanceInterval: 2,
+        },
+        (newLocation) => {
+          setUserPosition(newLocation.coords);
+        }
+      );
     })();
+
+    return () => {
+      watchSubscription?.remove();
+    };
   }, []);
+
+  // Vérifier la distance avec la fonction haversine
+  const checkDistance = (selectedLat: number, selectedLng: number) => {
+    if (!userPosition) return false;
+    const distance = haversineDistance(
+      userPosition.latitude,
+      userPosition.longitude,
+      selectedLat,
+      selectedLng
+    );
+    return distance <= DISTANCE_LIMIT_METERS;
+  };
 
   const handleCreateQueue = async () => {
     if (!name.trim()) {
-      Alert.alert('Nom requis', 'Veuillez entrer un nom pour la file d\'attente.');
+      Alert.alert('Nom requis', 'Veuillez entrer un nom pour la file.');
       return;
     }
     if (!location) {
       Alert.alert('Position indisponible', 'Impossible de récupérer votre position.');
+      return;
+    }
+    if (!checkDistance(location.latitude, location.longitude)) {
+      Alert.alert(
+        'Trop loin',
+        `Vous devez être à moins de ${DISTANCE_LIMIT_METERS} mètres de l’emplacement choisi.`
+      );
       return;
     }
     setLoading(true);
@@ -73,17 +148,23 @@ export default function CreateQueueScreen({ navigation }: Props) {
     }
   };
 
-  const onMapPress = (e: MapPressEvent) => {
+  const onMapPress = (e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setLocation({ latitude, longitude });
-    setRegion((prev) => prev ? { ...prev, latitude, longitude } : null);
   };
 
   const recenterToMyLocation = async () => {
-    const loc = await Location.getCurrentPositionAsync({});
-    const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-    setLocation(coords);
-    setRegion((prev) => prev ? { ...prev, ...coords } : null);
+    if (userPosition) {
+      const coords = {
+        latitude: userPosition.latitude,
+        longitude: userPosition.longitude,
+      };
+      setLocation(coords);
+      mapRef.current?.animateCamera({ center: coords, zoom: 18 });
+      setRegion((prev) => (prev ? { ...prev, ...coords } : null));
+    } else {
+      Alert.alert('Position inconnue', 'Votre position n’est pas encore disponible.');
+    }
   };
 
   if (locating) {
@@ -105,8 +186,6 @@ export default function CreateQueueScreen({ navigation }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.container}>
-
-          {/* Name Input */}
           <View style={styles.inputSection}>
             <Text style={styles.inputLabel}>Nom de la file</Text>
             <View style={styles.inputGroup}>
@@ -124,12 +203,13 @@ export default function CreateQueueScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* Map Section */}
           <View style={styles.mapSection}>
             <View style={styles.mapHeader}>
               <View>
                 <Text style={styles.inputLabel}>Localisation de la file</Text>
-                <Text style={styles.mapHint}>Appuyez sur la carte pour ajuster la position</Text>
+                <Text style={styles.mapHint}>
+                  Appuyez sur la carte pour ajuster le point • Position réelle suivie en direct
+                </Text>
               </View>
               <TouchableOpacity style={styles.recenterBtn} onPress={recenterToMyLocation}>
                 <Ionicons name="navigate" size={16} color="#1A73E8" />
@@ -139,12 +219,23 @@ export default function CreateQueueScreen({ navigation }: Props) {
             <View style={styles.mapContainer}>
               {region && (
                 <MapView
+                  ref={mapRef}
+                  provider={PROVIDER_GOOGLE}
                   style={styles.map}
                   region={region}
                   onPress={onMapPress}
                   showsUserLocation
                   showsMyLocationButton={false}
-                  showsCompass={false}
+                  mapType="hybrid"
+                  showsBuildings
+                  showsTraffic
+                  showsCompass
+                  zoomEnabled
+                  scrollEnabled
+                  rotateEnabled
+                  pitchEnabled
+                  minZoomLevel={5}
+                  maxZoomLevel={20}
                 >
                   {location && (
                     <Marker
@@ -163,7 +254,6 @@ export default function CreateQueueScreen({ navigation }: Props) {
                 </MapView>
               )}
 
-              {/* Map overlay info */}
               {location && (
                 <View style={styles.coordsOverlay}>
                   <Ionicons name="location-outline" size={12} color="#8A94A6" />
@@ -175,7 +265,6 @@ export default function CreateQueueScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {/* Create Button */}
           <TouchableOpacity
             style={[styles.createBtn, loading && styles.createBtnDisabled]}
             onPress={handleCreateQueue}
@@ -191,6 +280,10 @@ export default function CreateQueueScreen({ navigation }: Props) {
               </>
             )}
           </TouchableOpacity>
+
+          <Text style={styles.distanceNote}>
+            Vous devez être à moins de {DISTANCE_LIMIT_METERS} mètres du point choisi.
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -202,9 +295,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   locatingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   locatingText: { fontSize: 15, color: '#8A94A6', fontWeight: '500' },
-
   container: { flex: 1, padding: 20 },
-
   inputSection: { marginBottom: 20 },
   inputLabel: {
     fontSize: 13,
@@ -236,7 +327,6 @@ const styles = StyleSheet.create({
     color: '#0F1C3F',
     fontWeight: '500',
   },
-
   mapSection: { flex: 1, marginBottom: 20 },
   mapHeader: {
     flexDirection: 'row',
@@ -254,7 +344,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 2,
   },
-
   mapContainer: {
     flex: 1,
     borderRadius: 20,
@@ -269,7 +358,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   map: { flex: 1 },
-
   markerContainer: { alignItems: 'center' },
   markerBubble: {
     width: 40,
@@ -297,7 +385,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#1A73E8',
     marginTop: -1,
   },
-
   coordsOverlay: {
     position: 'absolute',
     bottom: 10,
@@ -309,14 +396,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   coordsText: { fontSize: 11, color: '#4A5568', fontWeight: '600' },
-
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,4 +413,10 @@ const styles = StyleSheet.create({
   },
   createBtnDisabled: { opacity: 0.7 },
   createBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
+  distanceNote: {
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#8A94A6',
+  },
 });
