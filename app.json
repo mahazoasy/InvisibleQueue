@@ -4,22 +4,24 @@
     "slug": "InvisibleQueue",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/splash-icons.png",
+    "icon": "./assets/splash.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icons.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.invisiblequeue"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash-icons.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/splash.png",
+        "backgroundColor": "#FFFFFF"
       },
+      "package": "com.yourcompany.invisiblequeue",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
