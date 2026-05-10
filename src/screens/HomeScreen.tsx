@@ -289,7 +289,7 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </Animated.View>
 
-      {/* ── Corps de page (fond clair) ───────────────────────────────────── */}
+      {/* ── Corps de page (fond clair) ── */}
       <View style={styles.body}>
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -331,7 +331,7 @@ export default function HomeScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* ── Modal rejoindre (invité) ─────────────────────────────────────── */}
+      {/* ── Modal rejoindre (invité) ───── */}
       <Modal visible={joinModalVisible} animationType="slide" transparent>
         <KeyboardAvoidingView
           style={styles.modalOverlay}

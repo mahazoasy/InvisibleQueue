@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   const displayName =
     user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur';
 
-  // Génération de l'URL Gravatar
+  // Génération de l'URL Gravatar(pour le photo de profil)
   let gravatarUrl = null;
   if (user?.email) {
     const emailHash = md5(user.email.trim().toLowerCase());
