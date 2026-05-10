@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "InvisibleQueue",
+    "name": "Invisible Queue",
     "slug": "InvisibleQueue",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/splash.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#0F1C3F"
     },
     "ios": {
       "supportsTablet": true,
@@ -18,8 +18,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/splash-icons.png",
+        "backgroundColor": "#0F1C3F"
       },
       "package": "com.yourcompany.invisiblequeue",
       "edgeToEdgeEnabled": true,
