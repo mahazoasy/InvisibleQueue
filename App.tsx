@@ -10,19 +10,7 @@ import CreateQueueScreen from './src/screens/CreateQueueScreen';
 import ActiveQueueScreen from './src/screens/ActiveQueueScreen';
 import ManageQueueScreen from './src/screens/ManageQueueScreen';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  Animated,
-  Dimensions,
-} from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
-
-SplashScreen.preventAutoHideAsync();
-
-const { width, height } = Dimensions.get('window');
+import { View, Text, Image, StyleSheet, Animated } from 'react-native';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -72,12 +60,23 @@ function HomeStack() {
           headerTitle: () => null,
         }}
       />
-      <Stack.Screen name="CreateQueue" component={CreateQueueScreen} options={{ title: 'Nouvelle file' }} />
-      <Stack.Screen name="ActiveQueue" component={ActiveQueueScreen} options={{ title: 'Ma position', headerBackTitle: '' }} />
+      <Stack.Screen
+        name="CreateQueue"
+        component={CreateQueueScreen}
+        options={{ title: 'Nouvelle file' }}
+      />
+      <Stack.Screen
+        name="ActiveQueue"
+        component={ActiveQueueScreen}
+        options={{ title: 'Ma position', headerBackTitle: '' }}
+      />
       <Stack.Screen
         name="ManageQueue"
         component={ManageQueueScreen}
-        options={({ route }) => ({ title: route.params?.queueName || 'Gestion', headerBackTitle: '' })}
+        options={({ route }) => ({
+          title: route.params?.queueName || 'Gestion',
+          headerBackTitle: '',
+        })}
       />
     </Stack.Navigator>
   );
@@ -118,7 +117,12 @@ function AppTabs() {
       <Tab.Screen
         name="Profil"
         component={ProfileScreen}
-        options={{ tabBarLabel: 'Profil', headerShown: true, headerTitle: 'Mon profil', ...headerOptions }}
+        options={{
+          tabBarLabel: 'Profil',
+          headerShown: true,
+          headerTitle: 'Mon profil',
+          ...headerOptions,
+        }}
       />
     </Tab.Navigator>
   );
@@ -137,64 +141,48 @@ function AppNavigator() {
   return <AppTabs />;
 }
 
-// ─── Splash animé ─────────────────────────────────────────────────────────────
+// ─── Splash personalisé animé ─────────────────────────────────────────────
+const SPLASH_VISIBLE_MS = 2500;
+
 function CustomSplash({ onFinish }: { onFinish: () => void }) {
-  const logoScale   = useRef(new Animated.Value(0.5)).current;
+  const logoScale = useRef(new Animated.Value(0.5)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleOpacity      = useRef(new Animated.Value(0)).current;
-  const titleTranslateY   = useRef(new Animated.Value(24)).current;
-  const subtitleOpacity   = useRef(new Animated.Value(0)).current;
-  const bgOpacity         = useRef(new Animated.Value(1)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const titleTranslateY = useRef(new Animated.Value(24)).current;
+  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  const bgOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
-      // Logo pop-in
       Animated.parallel([
-        Animated.spring(logoScale,   { toValue: 1, useNativeDriver: true, tension: 55, friction: 7 }),
+        Animated.spring(logoScale, { toValue: 1, useNativeDriver: true, tension: 55, friction: 7 }),
         Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
       ]),
-      // Titre slide-up
       Animated.parallel([
-        Animated.timing(titleOpacity,    { toValue: 1, duration: 320, useNativeDriver: true }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 320, useNativeDriver: true }),
         Animated.timing(titleTranslateY, { toValue: 0, duration: 320, useNativeDriver: true }),
       ]),
-      // Sous-titre fade
       Animated.timing(subtitleOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-      // Pause
-      Animated.delay(900),
-      // Fade out
+      Animated.delay(SPLASH_VISIBLE_MS - 1400),
       Animated.timing(bgOpacity, { toValue: 0, duration: 380, useNativeDriver: true }),
     ]).start(() => onFinish());
   }, []);
 
   return (
     <Animated.View style={[styles.splashContainer, { opacity: bgOpacity }]}>
-      {/* Cercles décoratifs en arrière-plan */}
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
-
-      {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 36 }}>
         <View style={styles.logoCircle}>
-          <Image
-            source={require('./assets/splash-icons.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+          <Image source={require('./assets/splash-icons.png')} style={styles.logoImage} resizeMode="contain" />
         </View>
       </Animated.View>
-
-      {/* Titre */}
       <Animated.Text style={[styles.splashTitle, { opacity: titleOpacity, transform: [{ translateY: titleTranslateY }] }]}>
         Invisible Queue
       </Animated.Text>
-
-      {/* Sous-titre */}
       <Animated.Text style={[styles.splashSubtitle, { opacity: subtitleOpacity }]}>
         Files d'attente virtuelles
       </Animated.Text>
-
-      {/* Indicateur bas */}
       <Animated.View style={[styles.splashDots, { opacity: subtitleOpacity }]}>
         <View style={[styles.dot, styles.dotActive]} />
         <View style={styles.dot} />
@@ -204,14 +192,8 @@ function CustomSplash({ onFinish }: { onFinish: () => void }) {
   );
 }
 
-// ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);
-
-  useEffect(() => {
-    // Cache le splash natif immédiatement ; notre splash JS prend le relai
-    SplashScreen.hideAsync();
-  }, []);
 
   if (!splashDone) {
     return <CustomSplash onFinish={() => setSplashDone(true)} />;
@@ -235,7 +217,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     overflow: 'hidden',
   },
-  // Cercles décoratifs
   bgCircle1: {
     position: 'absolute',
     width: 340,

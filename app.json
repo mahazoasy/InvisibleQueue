@@ -4,11 +4,12 @@
     "slug": "InvisibleQueue",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/splash-icons.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "backgroundColor": "#0F1C3F",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icons.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F1C3F"
     },
